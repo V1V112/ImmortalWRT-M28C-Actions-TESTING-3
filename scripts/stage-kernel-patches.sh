@@ -15,12 +15,14 @@ YAOF_REPO_URL="${YAOF_REPO_URL:-https://github.com/QiuSimons/YAOF.git}"
 YAOF_REF="${YAOF_REF:-25.12}"
 YAOF_SUPPORTED_KERNEL="${YAOF_SUPPORTED_KERNEL:-6.12}"
 tmp_dirs=()
+FETCHED_YAOF_DIR=""
 
 cleanup() {
   local dir
-  for dir in "${tmp_dirs[@]:-}"; do
+  for dir in "${tmp_dirs[@]}"; do
     [ -n "$dir" ] && rm -rf "$dir"
   done
+  return 0
 }
 trap cleanup EXIT
 
@@ -72,7 +74,7 @@ fetch_yaof() {
 
   if [ -n "${YAOF_SOURCE_DIR:-}" ]; then
     need_dir "$YAOF_SOURCE_DIR"
-    printf '%s\n' "$YAOF_SOURCE_DIR"
+    FETCHED_YAOF_DIR="$YAOF_SOURCE_DIR"
     return 0
   fi
 
@@ -90,7 +92,7 @@ fetch_yaof() {
 
   git -C "$dst" sparse-checkout set PATCH/kernel/bbr3 PATCH/kernel/lrng
 
-  printf '%s\n' "$dst"
+  FETCHED_YAOF_DIR="$dst"
 }
 
 stage_yaof_kernel_assets() {
@@ -101,7 +103,8 @@ stage_yaof_kernel_assets() {
     return 0
   fi
 
-  yaof_dir="$(fetch_yaof)"
+  fetch_yaof
+  yaof_dir="$FETCHED_YAOF_DIR"
 
   stage_patches \
     "$yaof_dir/PATCH/kernel/bbr3" \
@@ -119,12 +122,26 @@ stage_yaof_kernel_assets() {
 apply_openwrt_patches() {
   local src="$1"
   local patch_file
+  local reject_dir="$OPENWRT_DIR/.patch-rejects"
 
   [ -d "$src" ] || return 0
 
   while IFS= read -r -d '' patch_file; do
     log "Applying OpenWrt tree patch: ${patch_file#$PROJECT_DIR/}"
-    patch -d "$OPENWRT_DIR" -p1 --forward < "$patch_file"
+    if patch -d "$OPENWRT_DIR" -p1 --forward --dry-run < "$patch_file" >/dev/null; then
+      patch -d "$OPENWRT_DIR" -p1 --forward < "$patch_file"
+    elif patch -d "$OPENWRT_DIR" -p1 --reverse --dry-run < "$patch_file" >/dev/null 2>&1; then
+      warn "OpenWrt tree patch already applied, skipping: ${patch_file#$PROJECT_DIR/}"
+    else
+      mkdir -p "$reject_dir"
+      if ! patch -d "$OPENWRT_DIR" -p1 --forward --batch --reject-file="$reject_dir/$(basename "$patch_file").rej" < "$patch_file"; then
+        warn "OpenWrt tree patch failed: ${patch_file#$PROJECT_DIR/}"
+        if [ -s "$reject_dir/$(basename "$patch_file").rej" ]; then
+          sed 's/^/REJECT: /' "$reject_dir/$(basename "$patch_file").rej" >&2
+        fi
+        return 1
+      fi
+    fi
   done < <(find "$src" -name '*.patch' -type f -print0 | sort -z)
 }
 
