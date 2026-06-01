@@ -72,6 +72,9 @@ permissions:
 
 env:
   REPO_URL: https://github.com/immortalwrt/immortalwrt.git
+  YAOF_REPO_URL: https://github.com/QiuSimons/YAOF.git
+  YAOF_REF: 25.12
+  EXPECTED_BBR_VERSION: 3
   OPENWRT_DIR: ${{ github.workspace }}/workdir/immortalwrt
   PROJECT_DIR: ${{ github.workspace }}
   TZ: Asia/Shanghai
@@ -138,6 +141,12 @@ jobs:
           git checkout --detach FETCH_HEAD
           git log --oneline -1
 
+      - name: 应用 YAOF 编译优化
+        run: |
+          chmod +x scripts/*.sh
+          scripts/apply-yaof-optimizations.sh "$OPENWRT_DIR"
+          grep -nE -- '-O2|-mcpu=cortex-a53' "$OPENWRT_DIR/include/target.mk" | head || true
+
       - name: 恢复源码下载缓存和 ccache 缓存
         uses: actions/cache@v4
         with:
@@ -165,6 +174,10 @@ jobs:
         run: |
           scripts/stage-kernel-patches.sh "$OPENWRT_DIR"
 
+      - name: 检测 BBR 补丁版本
+        run: |
+          scripts/check-bbr-version.sh staged "$OPENWRT_DIR"
+
       - name: 放置自定义 overlay 文件（支持私人配置仓库）
         env:
           CUSTOM_CONFIG_REPO_URL: ${{ inputs.custom_config_repo }}
@@ -189,7 +202,7 @@ jobs:
           scripts/generate-config.sh "$OPENWRT_DIR" "profiles/${{ inputs.profile }}"
           cd "$OPENWRT_DIR"
           make defconfig
-          grep -E 'CONFIG_TARGET_rockchip|CONFIG_TARGET_PROFILE|CONFIG_TARGET_ROOTFS|CONFIG_TARGET_IMAGES_GZIP|CONFIG_KERNEL_(DEBUG_INFO|DEBUG_INFO_BTF|BPF_EVENTS|CGROUPS|CGROUP_BPF|XDP_SOCKETS)|CONFIG_PACKAGE_(momo|luci-app-momo|luci-theme-argon|luci-app-argon-config|ttyd|luci-app-ttyd|qmodem|luci-app-qmodem-next|at-webserver|luci-app-at-webserver|bpftool|kmod-tcp-bbr|kmod-nft-tproxy|kmod-usb-serial-option|kmod-hwmon-pwmfan)' .config || true
+          grep -E 'CONFIG_TARGET_rockchip|CONFIG_TARGET_PROFILE|CONFIG_TARGET_ROOTFS|CONFIG_TARGET_IMAGES_GZIP|CONFIG_(TOOLCHAINOPTS|ZLIB_OPTIMIZE_SPEED|OPENSSL_OPTIMIZE_SPEED|OPENSSL_WITH_ASM)|CONFIG_KERNEL_(DEBUG_INFO|DEBUG_INFO_BTF|BPF_EVENTS|CGROUPS|CGROUP_BPF|XDP_SOCKETS)|CONFIG_PACKAGE_(momo|luci-app-momo|luci-theme-argon|luci-app-argon-config|ttyd|luci-app-ttyd|qmodem|luci-app-qmodem-next|at-webserver|luci-app-at-webserver|bpftool|kmod-tcp-bbr|kmod-nft-tproxy|kmod-usb-serial-option|kmod-hwmon-pwmfan)' .config || true
 
       - name: 下载编译所需源码包
         run: |
@@ -208,6 +221,10 @@ jobs:
               exit 1
             fi
           fi
+
+      - name: 检测 BBR 模块版本
+        run: |
+          scripts/check-bbr-version.sh module "$OPENWRT_DIR"
 
       - name: 收集固件产物
         env:

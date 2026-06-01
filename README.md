@@ -11,6 +11,7 @@
 - rootfs 分区：`1024 MB`
 - 镜像压缩：启用 `gzip`
 - 构建缓存：启用 `ccache`
+- YAOF 复用：O2/CFLAGS 优化、BBRv3、LRNG
 
 ## 固件特性
 
@@ -21,6 +22,14 @@
 - 使用 SquashFS rootfs，并生成 gzip 压缩镜像。
 - rootfs 分区默认设置为 `1024 MB`，适合内置较多插件和 WebUI 资源。
 - 启用构建日志和 ccache，便于 GitHub Actions 上排错和加速后续构建。
+
+### YAOF 编译与内核增强
+
+- 编译阶段复用 YAOF 的 O2 优化做法，将 ImmortalWrt `include/target.mk` 中的 `-Os` 调整为 `-O2`，并针对 M28C 的 Cortex-A53 添加 CFLAGS 优化。
+- 启用 `CONFIG_TOOLCHAINOPTS`、ZLIB speed、OpenSSL speed 和 OpenSSL ASM。
+- Linux 6.12 构建会在编译过程中拉取 `QiuSimons/YAOF`，并从 YAOF 仓库复制 BBRv3 补丁到 `generic/backport-6.12`、LRNG 补丁到 `generic/hack-6.12`；本仓库不保存这些上游补丁文件。
+- 自动追加 LRNG 内核配置，并默认启用 LRNG 设备接口、Jitter RNG、CPU entropy source 和 selftest。
+- workflow 会检测 staged 补丁中的 `BBR_VERSION`，并在编译完成后读取 `tcp_bbr.ko` 的 module version，确认实际构建结果为 BBRv3。
 
 ### LuCI 与管理界面
 
@@ -35,7 +44,7 @@
 - 使用 Firewall4 / nftables 体系。
 - 内置 nftables、NAT、flow offload、TProxy、socket match 等相关内核模块。
 - 内置 `ip-full`、`tc-full`、`ethtool`、`curl`、`wget-ssl` 等常用网络工具。
-- 内置 `kmod-tcp-bbr`，支持 BBR 拥塞控制。
+- 集成 YAOF 的 BBRv3 补丁，内置 `kmod-tcp-bbr`，并通过 sysctl 默认启用 `bbr` + `fq`。
 - 内置 `kmod-tun`、`kmod-ifb`、`kmod-sched-*` 等流量控制和代理常用模块。
 
 ### 5G 模块支持
@@ -218,7 +227,7 @@ local-packages/<collection>/<package-name>/Makefile
 - `patches/kernel/rockchip/`：Rockchip 平台内核补丁目录。
 - 当前补丁：`999-usb-serial-option-add-mt5700-3466-3301.patch`，用于补充 MT5700 USB 串口识别。
 
-`scripts/stage-kernel-patches.sh` 会自动检测 rockchip 目标使用的 `KERNEL_PATCHVER`，并把通用补丁复制到 `target/linux/generic/hack-<kernel-version>/`，把 Rockchip 平台补丁复制到 `target/linux/rockchip/patches-<kernel-version>/`。通用补丁目录不存在时会回退到 `target/linux/generic/hack/`。
+`scripts/stage-kernel-patches.sh` 会自动检测 rockchip 目标使用的 `KERNEL_PATCHVER`，把本仓库通用补丁复制到 `target/linux/generic/hack-<kernel-version>/`，把 Rockchip 平台补丁应用到 OpenWrt 源码树。检测到 Linux 6.12 时，还会按 workflow 中的 `YAOF_REPO_URL` / `YAOF_REF` 拉取 YAOF 并注入 BBRv3、LRNG。
 
 ### `profiles/`
 
@@ -234,7 +243,8 @@ local-packages/<collection>/<package-name>/Makefile
 - `common.sh`：公共函数，如日志、错误退出、路径检测。
 - `add-feeds.sh`：合并 `feeds/*.feeds` 和 workflow 的 `extra_feeds`，并跳过重复 feed。
 - `prepare-packages.sh`：克隆 `package-sources.conf` 中的单包源码，复制 `local-packages/` 中的本地包，并移除上游冲突包。
-- `stage-kernel-patches.sh`：把 `patches/kernel/generic/*.patch` 和 `patches/kernel/rockchip/*.patch` 放入 ImmortalWrt 内核补丁目录。
+- `stage-kernel-patches.sh`：放置本地内核补丁，并在 Linux 6.12 构建中按需拉取 YAOF 的 BBRv3 / LRNG 补丁。
+- `check-bbr-version.sh`：检测 staged BBR 补丁版本和编译产物 `tcp_bbr.ko` 的 module version。
 - `stage-overlay.sh`：把 `files/` 注入 ImmortalWrt 的 rootfs overlay，并特殊处理 `files/usr/bin/`。
 - `generate-config.sh`：合并 `target.config`、`packages.txt`、`configs/custom.config`、`extra_packages` 和 `extra_config`，生成最终 `.config`。
 
