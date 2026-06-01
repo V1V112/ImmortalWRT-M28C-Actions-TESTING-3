@@ -1,0 +1,233 @@
+name: 编译 ImmortalWrt M28C 固件（支持私人配置仓库）
+
+on:
+  workflow_dispatch:
+    inputs:
+      immortalwrt_version:
+        description: "选择 ImmortalWrt 版本"
+        required: true
+        default: "openwrt-25.12"
+        type: choice
+        options:
+          - openwrt-25.12
+          - v25.12.0-rc2
+          - master
+          - custom
+
+      custom_ref:
+        description: "自定义 ImmortalWrt 分支或标签；只有选择 custom 时才需要填写"
+        required: false
+        default: ""
+        type: string
+
+      profile:
+        description: "编译配置方案"
+        required: true
+        default: "m28c"
+        type: choice
+        options:
+          - m28c
+
+      custom_config_repo:
+        description: "（可选）私人 OpenWrt 配置仓库 URL"
+        required: false
+        type: string
+        default: ""
+
+      custom_config_branch:
+        description: "配置仓库分支"
+        required: false
+        type: string
+        default: "main"
+
+      extra_feeds:
+        description: "可选：额外 feeds 源，每行一个 src-git 配置"
+        required: false
+        type: string
+
+      extra_packages:
+        description: "可选：额外软件包名称。前面加 - 表示禁用某个软件包"
+        required: false
+        type: string
+
+      extra_config:
+        description: "可选：追加到 profile 配置之后的原始 .config 配置行"
+        required: false
+        type: string
+
+      upload_packages:
+        description: "是否把 bin/packages 目录也作为构建产物上传"
+        required: true
+        default: false
+        type: boolean
+
+      verbose_fallback:
+        description: "编译失败后是否使用 make -j1 V=s 重新尝试并输出详细日志"
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+env:
+  REPO_URL: https://github.com/immortalwrt/immortalwrt.git
+  OPENWRT_DIR: ${{ github.workspace }}/workdir/immortalwrt
+  PROJECT_DIR: ${{ github.workspace }}
+  TZ: Asia/Shanghai
+
+jobs:
+  build:
+    name: 编译 ${{ inputs.profile }} / ${{ inputs.immortalwrt_version }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+
+    steps:
+      - name: 拉取当前项目仓库
+        uses: actions/checkout@v4
+
+      - name: 解析 ImmortalWrt 版本
+        id: resolve_ref
+        env:
+          IMMORTALWRT_VERSION: ${{ inputs.immortalwrt_version }}
+          IMMORTALWRT_CUSTOM_REF: ${{ inputs.custom_ref }}
+        run: |
+          set -eu
+
+          if [ "$IMMORTALWRT_VERSION" = "custom" ]; then
+            if [ -z "${IMMORTALWRT_CUSTOM_REF:-}" ]; then
+              echo "错误：当版本选择 custom 时，必须填写 custom_ref。"
+              exit 1
+            fi
+            ref="$IMMORTALWRT_CUSTOM_REF"
+          else
+            ref="$IMMORTALWRT_VERSION"
+          fi
+
+          safe_ref="${ref//\//-}"
+
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+          echo "safe_ref=$safe_ref" >> "$GITHUB_OUTPUT"
+
+          echo "当前选择的 ImmortalWrt 版本：$ref"
+
+      - name: 释放磁盘空间
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/lib/android || true
+          docker system prune -af || true
+          df -h
+
+      - name: 安装编译依赖
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential clang flex bison g++ gawk gcc-multilib g++-multilib \
+            gettext git libncurses-dev libssl-dev python3 python3-setuptools \
+            python3-pyelftools rsync swig unzip zlib1g-dev file wget curl ccache \
+            libelf-dev dwarves zstd zip tar xz-utils jq
+
+      - name: 拉取 ImmortalWrt 源码
+        env:
+          IMMORTALWRT_REF: ${{ steps.resolve_ref.outputs.ref }}
+        run: |
+          mkdir -p "$(dirname "$OPENWRT_DIR")"
+          git init "$OPENWRT_DIR"
+          cd "$OPENWRT_DIR"
+          git remote add origin "$REPO_URL"
+          git fetch --depth=1 origin "$IMMORTALWRT_REF"
+          git checkout --detach FETCH_HEAD
+          git log --oneline -1
+
+      - name: 恢复源码下载缓存和 ccache 缓存
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ env.OPENWRT_DIR }}/dl
+            ${{ env.OPENWRT_DIR }}/.ccache
+          key: immortalwrt-${{ steps.resolve_ref.outputs.safe_ref }}-${{ hashFiles('profiles/**', 'configs/**', 'feeds/**', 'scripts/**', 'package/**', 'files/**') }}
+          restore-keys: |
+            immortalwrt-${{ steps.resolve_ref.outputs.safe_ref }}-
+            immortalwrt-
+
+      - name: 准备 feeds 和自定义软件包
+        env:
+          EXTRA_FEEDS: ${{ inputs.extra_feeds }}
+        run: |
+          chmod +x scripts/*.sh
+          scripts/add-feeds.sh "$OPENWRT_DIR"
+          cd "$OPENWRT_DIR"
+          ./scripts/feeds update -a
+          ./scripts/feeds install -a
+          cd "$PROJECT_DIR"
+          scripts/prepare-packages.sh "$OPENWRT_DIR"
+
+      - name: 应用内核补丁
+        run: |
+          scripts/stage-kernel-patches.sh "$OPENWRT_DIR"
+
+      - name: 放置自定义 overlay 文件（支持私人配置仓库）
+        env:
+          CUSTOM_CONFIG_REPO_URL: ${{ inputs.custom_config_repo }}
+          CUSTOM_CONFIG_BRANCH: ${{ inputs.custom_config_branch }}
+          CUSTOM_CONFIG_TOKEN: ${{ secrets.CUSTOM_CONFIG_TOKEN }}
+        run: |
+          chmod +x scripts/prepare-overlay.sh
+          
+          if [ -n "$CUSTOM_CONFIG_REPO_URL" ]; then
+            echo "正在从私人仓库拉取配置..."
+            scripts/prepare-overlay.sh "$OPENWRT_DIR"
+          else
+            echo "使用本地 files 目录配置..."
+            scripts/stage-overlay.sh "$OPENWRT_DIR"
+          fi
+
+      - name: 生成 .config 配置
+        env:
+          EXTRA_PACKAGES: ${{ inputs.extra_packages }}
+          EXTRA_CONFIG: ${{ inputs.extra_config }}
+        run: |
+          scripts/generate-config.sh "$OPENWRT_DIR" "profiles/${{ inputs.profile }}"
+          cd "$OPENWRT_DIR"
+          make defconfig
+          grep -E 'CONFIG_TARGET_rockchip|CONFIG_TARGET_PROFILE|CONFIG_TARGET_ROOTFS|CONFIG_TARGET_IMAGES_GZIP|CONFIG_KERNEL_(DEBUG_INFO|DEBUG_INFO_BTF|BPF_EVENTS|CGROUPS|CGROUP_BPF|XDP_SOCKETS)|CONFIG_PACKAGE_(momo|luci-app-momo|luci-theme-argon|luci-app-argon-config|ttyd|luci-app-ttyd|qmodem|luci-app-qmodem-next|at-webserver|luci-app-at-webserver|bpftool|kmod-tcp-bbr|kmod-nft-tproxy|kmod-usb-serial-option|kmod-hwmon-pwmfan)' .config || true
+
+      - name: 下载编译所需源码包
+        run: |
+          cd "$OPENWRT_DIR"
+          make download -j"$(nproc)" || make download -j1 V=s
+
+      - name: 编译固件
+        env:
+          VERBOSE_FALLBACK: ${{ inputs.verbose_fallback }}
+        run: |
+          cd "$OPENWRT_DIR"
+          if ! make -j"$(nproc)"; then
+            if [ "$VERBOSE_FALLBACK" = "true" ]; then
+              make -j1 V=s
+            else
+              exit 1
+            fi
+          fi
+
+      - name: 收集固件产物
+        env:
+          IMMORTALWRT_REF: ${{ steps.resolve_ref.outputs.ref }}
+          SAFE_REF: ${{ steps.resolve_ref.outputs.safe_ref }}
+        run: |
+          out="$PROJECT_DIR/artifacts/immortalwrt-${SAFE_REF}-${{ inputs.profile }}"
+          mkdir -p "$out/targets"
+          cp "$OPENWRT_DIR/.config" "$out/config.build"
+          rsync -a "$OPENWRT_DIR/bin/targets/" "$out/targets/"
+          if [ "${{ inputs.upload_packages }}" = "true" ] && [ -d "$OPENWRT_DIR/bin/packages" ]; then
+            mkdir -p "$out/packages"
+            rsync -a "$OPENWRT_DIR/bin/packages/" "$out/packages/"
+          fi
+          find "$out" -type f \( -name "*.buildinfo" -o -name "*.manifest" -o -name "sha256sums" -o -name "*.json" \) | sort || true
+
+      - name: 上传固件
+        uses: actions/upload-artifact@v4
+        with:
+          name: immortalwrt-${{ github.run_number }}-${{ inputs.profile }}-${{ steps.resolve_ref.outputs.safe_ref }}
+          path: artifacts/
+          if-no-files-found: error
+          retention-days: 14

@@ -1,0 +1,21 @@
+# 项目默认启用的第三方 OpenWrt feeds。
+#
+# 作用：
+# - 这里的内容会在执行 ./scripts/feeds update 之前合并到 ImmortalWrt
+#   源码目录的 feeds.conf.default。
+# - 后续由 ./scripts/feeds update -a 和 ./scripts/feeds install -a 拉取并安装。
+#
+# 适合放什么：
+# - 项目长期默认需要的第三方 feed。
+# - 仓库本身是标准 OpenWrt feed 结构，里面可以包含一个或多个软件包。
+#
+# 注意：
+# - 这里只是提供源码 feed，不代表软件包一定会内置进固件。
+# - 是否内置由 profiles/<profile>/packages.txt 里的包名决定。
+# - feed 名称可能会被 OpenWrt 用来生成运行时 APK 源；如果镜像站没有对应
+#   二进制仓库，需要额外排除，避免 apk update 请求不存在的 packages.adb。
+# - scripts/add-feeds.sh 会按 feed 名称和仓库 URL 跳过重复项。
+#
+# 格式：
+# src-git <feed-name> <repo-url>;<branch-or-tag>
+

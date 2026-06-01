@@ -1,0 +1,28 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: ImmortalWrt M28C Builder <builder@example.invalid>
+Date: Tue, 28 Apr 2026 00:00:00 +0800
+Subject: [PATCH] USB: serial: option: add MT5700 3466:3301
+
+Add the MT5700 USB serial device ID so the option driver can bind its
+AT command interfaces.
+
+--- a/drivers/usb/serial/option.c
++++ b/drivers/usb/serial/option.c
+@@ -82,6 +82,9 @@ static void option_instat_callback(struc
+ #define HUAWEI_PRODUCT_K3765			0x1465
+ #define HUAWEI_PRODUCT_K4605			0x14C6
+ #define HUAWEI_PRODUCT_E173S6			0x1C07
++/* MT5700 module */
++#define MT5700_VENDOR_ID			0x3466
++#define MT5700_PRODUCT_3301			0x3301
+ 
+ #define QUANTA_VENDOR_ID			0x0408
+ #define QUANTA_PRODUCT_Q101			0xEA02
+@@ -697,6 +700,7 @@ static const struct usb_device_id option
+ 	{ USB_DEVICE_AND_INTERFACE_INFO(HUAWEI_VENDOR_ID, HUAWEI_PRODUCT_K4605, 0xff, 0xff, 0xff),
+ 	  .driver_info = RSVD(1) | RSVD(2) },
+ 	{ USB_VENDOR_AND_INTERFACE_INFO(HUAWEI_VENDOR_ID, 0xff, 0xff, 0xff) },
++	{ USB_DEVICE(MT5700_VENDOR_ID, MT5700_PRODUCT_3301) },
+ 	{ USB_VENDOR_AND_INTERFACE_INFO(HUAWEI_VENDOR_ID, 0xff, 0x01, 0x01) },
+ 	{ USB_VENDOR_AND_INTERFACE_INFO(HUAWEI_VENDOR_ID, 0xff, 0x01, 0x02) },
+ 	{ USB_VENDOR_AND_INTERFACE_INFO(HUAWEI_VENDOR_ID, 0xff, 0x01, 0x03) },

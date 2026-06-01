@@ -1,0 +1,26 @@
+# 你自己追加的第三方 OpenWrt feeds。
+#
+# 作用：
+# - 和 third-party.feeds 一样，会被 scripts/add-feeds.sh 合并到 ImmortalWrt
+#   源码目录的 feeds.conf.default。
+# - 后续由 ./scripts/feeds update -a 和 ./scripts/feeds install -a 拉取并安装。
+#
+# 适合放什么：
+# - 你后期临时测试或自己长期维护的 feed。
+# - 不想混进项目默认 third-party.feeds 的个人 feed。
+#
+# 和 third-party.feeds 的区别：
+# - third-party.feeds 放项目默认配置。
+# - custom.feeds 放个人追加配置，方便后期维护和迁移。
+#
+# 注意：
+# - 这里只是提供源码 feed，不代表软件包一定会内置进固件。
+# - 是否内置由 profiles/<profile>/packages.txt 里的包名决定。
+# - 也可以在 GitHub Actions 的 extra_feeds 输入框临时追加 feed。
+# - scripts/add-feeds.sh 会按 feed 名称和仓库 URL 跳过重复项。
+#
+# 格式：
+# src-git <feed-name> <repo-url>;<branch-or-tag>
+#
+# 示例：
+# src-git myfeed https://github.com/example/openwrt-packages.git;main

@@ -1,0 +1,131 @@
+# ============================================================
+# MangoPi M28C / Widora M28C - 软件包配置
+# 由用户上传的 m28c.config 拆分生成。
+# 每行一个软件包；前面加 "-" 表示强制禁用。
+# ============================================================
+
+# LuCI Web 管理界面
+luci
+luci-base
+luci-ssl
+luci-compat
+luci-i18n-base-zh-cn
+
+# 主题
+# argon
+luci-theme-argon
+luci-app-argon-config
+luci-i18n-argon-config-zh-cn
+
+# aurora
+luci-theme-aurora
+luci-app-aurora-config
+luci-i18n-aurora-config-zh-cn
+
+# material3
+luci-theme-material3
+
+# Firewall4 / nftables 防火墙支持
+firewall4
+nftables-json
+kmod-nft-core
+kmod-nft-nat
+kmod-nft-fib
+kmod-nft-offload
+kmod-nft-socket
+kmod-nft-tproxy
+kmod-inet-diag
+
+# TCP 拥塞控制算法支持
+kmod-tcp-bbr
+
+# ttyd 网页终端
+ttyd
+luci-app-ttyd
+
+# 常用网络与系统工具
+curl
+wget-ssl
+ca-bundle
+ca-certificates
+ip-full
+tc-full
+openssh-sftp-server
+ethtool
+htop
+nano
+vim
+usbutils
+pciutils
+
+# Rockchip / MangoPi M28C 相关硬件支持
+kmod-hwmon-pwmfan
+kmod-aic8800-sdio
+wpad-openssl
+
+# USB 基础支持
+kmod-usb-core
+kmod-usb2
+kmod-usb3
+kmod-usb-storage
+block-mount
+kmod-usb-net
+
+# QModem-next / 5G 模块管理插件
+qmodem
+sms-forwarder-next
+luci-app-qmodem-next
+luci-i18n-qmodem-next-zh-cn
+
+# USB 串口 / AT 口 / 5G 模块识别支持
+kmod-usb-serial
+kmod-usb-serial-option
+kmod-usb-serial-wwan
+kmod-usb-serial-qualcomm
+kmod-usb-acm
+kmod-usb-wdm
+
+# QMI / MBIM / NCM / RNDIS / ECM 5G 拨号模式支持
+kmod-usb-net-qmi-wwan
+kmod-usb-net-cdc-mbim
+kmod-usb-net-cdc-ncm
+kmod-usb-net-huawei-cdc-ncm
+kmod-usb-net-rndis
+kmod-usb-net-cdc-ether
+uqmi
+umbim
+comgt
+comgt-ncm
+wwan
+luci-proto-qmi
+luci-proto-mbim
+
+# eBPF / 流控 / 透明代理辅助模块
+bpftool
+kmod-sched-core
+kmod-sched-bpf
+kmod-ifb
+kmod-tun
+
+# momo 透明代理插件
+momo
+luci-app-momo
+luci-i18n-momo-zh-cn
+
+# MT5700 AT WebServer / WebUI
+at-webserver
+luci-app-at-webserver
+
+# smartdns
+smartdns
+smartdns-ui
+luci-app-smartdns
+luci-i18n-smartdns-zh-cn
+
+# mosdns
+mosdns
+luci-app-mosdns
+luci-i18n-mosdns-zh-cn
+v2ray-geoip
+v2ray-geosite
+v2dat

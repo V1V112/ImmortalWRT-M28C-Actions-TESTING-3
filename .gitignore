@@ -1,0 +1,9 @@
+workdir/
+artifacts/
+*.log
+*.tmp
+.DS_Store
+Thumbs.db
+
+# 允许下面的列表提交
+!files/etc/mosdns/mosdns.log
