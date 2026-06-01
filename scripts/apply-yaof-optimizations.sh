@@ -18,7 +18,6 @@ need_file "$kernel_defaults_mk"
 log "Applying YAOF O2 target optimization"
 sed -i \
   -e 's/-Os/-O2/g' \
-  -e 's/ -mcpu=generic/ -mcpu=cortex-a53/g' \
   "$target_mk"
 
 if ! grep -q 'YAOF: auto-fill new kernel Kconfig defaults' "$kernel_defaults_mk"; then

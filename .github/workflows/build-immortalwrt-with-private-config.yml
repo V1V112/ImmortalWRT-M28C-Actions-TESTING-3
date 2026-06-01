@@ -145,7 +145,7 @@ jobs:
         run: |
           chmod +x scripts/*.sh
           scripts/apply-yaof-optimizations.sh "$OPENWRT_DIR"
-          grep -nE -- '-O2|-mcpu=cortex-a53' "$OPENWRT_DIR/include/target.mk" | head || true
+          grep -n -- '-O2' "$OPENWRT_DIR/include/target.mk" | head || true
 
       - name: 恢复源码下载缓存和 ccache 缓存
         uses: actions/cache@v4
@@ -213,14 +213,29 @@ jobs:
         env:
           VERBOSE_FALLBACK: ${{ inputs.verbose_fallback }}
         run: |
+          set -o pipefail
           cd "$OPENWRT_DIR"
+          mkdir -p "$PROJECT_DIR/artifacts/failure-logs"
           if ! make -j"$(nproc)"; then
             if [ "$VERBOSE_FALLBACK" = "true" ]; then
-              make -j1 V=s
+              make -j1 V=s 2>&1 | tee "$PROJECT_DIR/artifacts/failure-logs/make-j1-vs.log"
             else
               exit 1
             fi
           fi
+
+      - name: 上传失败诊断日志
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: failure-logs-${{ github.run_number }}-${{ inputs.profile }}-${{ steps.resolve_ref.outputs.safe_ref }}
+          path: |
+            artifacts/failure-logs/
+            ${{ env.OPENWRT_DIR }}/.config
+            ${{ env.OPENWRT_DIR }}/logs/
+            ${{ env.OPENWRT_DIR }}/tmp/.config-*
+          if-no-files-found: warn
+          retention-days: 14
 
       - name: 检测 BBR 模块版本
         run: |
