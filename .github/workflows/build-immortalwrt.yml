@@ -28,6 +28,12 @@ on:
         options:
           - m28c
 
+      enable_o2_cflags:
+        description: "Enable optional YAOF O2/CFLAGS build optimization"
+        required: true
+        default: false
+        type: boolean
+
       extra_feeds:
         description: "可选：额外 feeds 源，每行一个 src-git 配置"
         required: false
@@ -130,6 +136,7 @@ jobs:
           git log --oneline -1
 
       - name: 应用 YAOF 编译优化
+        if: ${{ inputs.enable_o2_cflags == true }}
         run: |
           chmod +x scripts/*.sh
           scripts/apply-yaof-optimizations.sh "$OPENWRT_DIR"
@@ -179,6 +186,7 @@ jobs:
         env:
           EXTRA_PACKAGES: ${{ inputs.extra_packages }}
           EXTRA_CONFIG: ${{ inputs.extra_config }}
+          ENABLE_O2_CFLAGS: ${{ inputs.enable_o2_cflags }}
         run: |
           scripts/generate-config.sh "$OPENWRT_DIR" "profiles/${{ inputs.profile }}"
           cd "$OPENWRT_DIR"

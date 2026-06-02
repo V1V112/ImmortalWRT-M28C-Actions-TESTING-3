@@ -11,7 +11,7 @@
 - rootfs 分区：`1024 MB`
 - 镜像压缩：启用 `gzip`
 - 构建缓存：启用 `ccache`
-- YAOF 复用：O2/CFLAGS 优化、BBRv3、LRNG
+- YAOF 复用：可选 O2/CFLAGS 优化、BBRv3、LRNG
 
 ## 固件特性
 
@@ -25,8 +25,8 @@
 
 ### YAOF 编译与内核增强
 
-- 编译阶段复用 YAOF 的 O2 优化做法，将 ImmortalWrt `include/target.mk` 中的 `-Os` 调整为 `-O2`，并针对 M28C 的 Cortex-A53 添加 CFLAGS 优化。
-- 启用 `CONFIG_TOOLCHAINOPTS`、ZLIB speed、OpenSSL speed 和 OpenSSL ASM。
+- O2/CFLAGS 优化已改为 workflow 可选项，输入项 `enable_o2_cflags` 默认为 `false`。
+- 启用该选项后，会复用 YAOF 的 O2 优化做法，将 ImmortalWrt `include/target.mk` 中的 `-Os` 调整为 `-O2`，并追加 `CONFIG_TOOLCHAINOPTS`、ZLIB speed、OpenSSL speed 和 OpenSSL ASM。
 - Linux 6.12 构建会在编译过程中拉取 `QiuSimons/YAOF`，并从 YAOF 仓库复制 BBRv3 补丁到 `generic/backport-6.12`、LRNG 补丁到 `generic/hack-6.12`；本仓库不保存这些上游补丁文件。
 - 自动追加 LRNG 内核配置，并默认启用 LRNG 设备接口、Jitter RNG、CPU entropy source 和 selftest。
 - workflow 会检测 staged 补丁中的 `BBR_VERSION`，并在编译完成后读取 `tcp_bbr.ko` 的 module version，确认实际构建结果为 BBRv3。

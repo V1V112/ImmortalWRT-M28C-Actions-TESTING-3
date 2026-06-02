@@ -76,6 +76,14 @@ trap 'rm -f "$tmp"' EXIT
     cat "$CUSTOM_CONFIG"
   fi
 
+  if [ "${ENABLE_O2_CFLAGS:-false}" = "true" ]; then
+    printf '\n# Optional YAOF O2/CFLAGS optimization\n'
+    printf 'CONFIG_TOOLCHAINOPTS=y\n'
+    printf 'CONFIG_ZLIB_OPTIMIZE_SPEED=y\n'
+    printf 'CONFIG_OPENSSL_OPTIMIZE_SPEED=y\n'
+    printf 'CONFIG_OPENSSL_WITH_ASM=y\n'
+  fi
+
   if [ -n "${EXTRA_CONFIG:-}" ]; then
     printf '\n# Raw config from workflow extra_config\n'
     printf '%s\n' "$EXTRA_CONFIG"
