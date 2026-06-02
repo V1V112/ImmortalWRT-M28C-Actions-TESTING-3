@@ -118,6 +118,7 @@ stage_yaof_kernel_assets() {
     "$OPENWRT_DIR/target/linux/generic/hack"
 
   append_yaof_lrng_config
+  bash "$SCRIPT_DIR/apply-kernel-olddefconfig-fallback.sh" "$OPENWRT_DIR"
 }
 
 apply_openwrt_patches() {
