@@ -37,6 +37,7 @@ detect_staged_patch_version() {
 
 detect_module_version() {
   local module_file=""
+  local source_file=""
   local version=""
 
   module_file="$(
@@ -55,10 +56,24 @@ detect_module_version() {
     version="$(strings "$module_file" | sed -n 's/^version=//p' | head -n 1)"
   fi
 
-  [ -n "$version" ] || die "Unable to read BBR module version from $module_file"
-  [ "$version" = "$EXPECTED_BBR_VERSION" ] || die "Expected BBR module v$EXPECTED_BBR_VERSION, detected v$version"
+  if [ -z "$version" ]; then
+    source_file="$(
+      find "$OPENWRT_DIR/build_dir" -path '*/linux-*/net/ipv4/tcp_bbr.c' -type f 2>/dev/null |
+        sort |
+        head -n 1 || true
+    )"
 
-  log "Detected built BBR module version: v$version (${module_file#$OPENWRT_DIR/})"
+    if [ -n "$source_file" ]; then
+      version="$(
+        awk '/^[[:space:]]*#[[:space:]]*define[[:space:]]+BBR_VERSION[[:space:]]+[0-9]+/ { print $NF; exit }' "$source_file"
+      )"
+    fi
+  fi
+
+  [ -n "$version" ] || die "Unable to read BBR version from $module_file"
+  [ "$version" = "$EXPECTED_BBR_VERSION" ] || die "Expected BBR v$EXPECTED_BBR_VERSION, detected v$version"
+
+  log "Detected built BBR version: v$version (${module_file#$OPENWRT_DIR/})"
 }
 
 case "$MODE" in
