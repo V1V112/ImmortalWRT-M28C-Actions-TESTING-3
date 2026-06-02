@@ -29,7 +29,7 @@ on:
           - m28c
 
       enable_o2_cflags:
-        description: "Enable optional YAOF O2/CFLAGS build optimization"
+        description: "启用可选的YAOF O2/CFLAGS构建优化"
         required: true
         default: false
         type: boolean
